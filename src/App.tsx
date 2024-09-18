@@ -1,21 +1,11 @@
-import { useState, useEffect } from "react";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
-import {
-  Form,
-  Input,
-  Button,
-  message,
-  Progress,
-  Card,
-  Row,
-  Col,
-  Avatar,
-} from "antd";
+import { Form, Input, message, Progress, Card, Row, Col, Avatar } from "antd";
 import "./App.css";
 import KryptoAbi from "./Kryptoabi.json";
 import Header from "./Components/Header";
 import Footer from "./Components/Footer";
-import Player from "react-lottie-player";
 import { InfoCircleOutlined } from "@ant-design/icons";
 
 const contractAddress = "0x3F75dA12899634Ad91E16D230B5a55C576103F10";
@@ -35,50 +25,30 @@ function App() {
   const [minInvestment, setMinInvestment] = useState<string>("0");
   const [icostate, setIcoState] = useState<string>("");
 
-  useEffect(() => {
-    if (window.ethereum) {
-      const tempProvider = new ethers.BrowserProvider(window.ethereum);
-      setProvider(tempProvider);
+  // Fetch ICO details and set state
+  const fetchIcoDetails = useCallback(async (contract: ethers.Contract) => {
+    try {
+      const totalSupply = await contract.totalSupply();
+      const totalRaised = await contract.raisedAmount();
+      const tokenPrice = await contract.tokenPrice();
+      const hardCap = await contract.hardCap();
+      const maxInvestment = await contract.maxInvestment();
+      const minInvestment = await contract.minInvestment();
+      const stateDescription = await getCurrentState(contract); // Fetch ICO state
 
-      const contractInstance = new ethers.Contract(
-        contractAddress,
-        abi,
-        tempProvider
-      );
-      fetchIcoDetails(contractInstance);
-    } else {
-      console.error("MetaMask not detected");
+      setTotalSupply(Number(totalSupply));
+      setTotalRaised(ethers.formatEther(totalRaised));
+      setTokenPrice(ethers.formatEther(tokenPrice));
+      setHardCap(ethers.formatEther(hardCap));
+      setMaxInvestment(ethers.formatEther(maxInvestment));
+      setMinInvestment(ethers.formatEther(minInvestment));
+      setIcoState(stateDescription); // Set the ICO state
+    } catch (error) {
+      console.error("Failed to fetch ICO details", error);
     }
   }, []);
 
-  const connectWallet = async () => {
-    if (!provider) return;
-
-    try {
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      const contractInstance = new ethers.Contract(
-        contractAddress,
-        abi,
-        signer
-      );
-
-      const userAddress = await signer.getAddress();
-      setSigner(signer);
-      setContract(contractInstance);
-      setAccount(userAddress);
-      setConnected(true);
-    } catch (error) {
-      console.error("Failed to connect wallet", error);
-    }
-  };
-
-  const disconnectWallet = () => {
-    setSigner(null);
-    setAccount(null);
-    setConnected(false);
-  };
-
+  // Get current ICO state
   const getCurrentState = async (contract: ethers.Contract) => {
     try {
       const state = Number(await contract.getCurrentState());
@@ -110,28 +80,37 @@ function App() {
     }
   };
 
-  const fetchIcoDetails = async (contract: ethers.Contract) => {
-    try {
-      const totalSupply = await contract.totalSupply();
-      const totalRaised = await contract.raisedAmount();
-      const tokenPrice = await contract.tokenPrice();
-      const hardCap = await contract.hardCap();
-      const maxInvestment = await contract.maxInvestment();
-      const minInvestment = await contract.minInvestment();
-      const stateDescription = await getCurrentState(contract); // Fetch ICO state
+  // Connect wallet and set state
+  const connectWallet = async () => {
+    if (!provider) return;
 
-      setTotalSupply(Number(totalSupply));
-      setTotalRaised(ethers.formatEther(totalRaised));
-      setTokenPrice(ethers.formatEther(tokenPrice));
-      setHardCap(ethers.formatEther(hardCap));
-      setMaxInvestment(ethers.formatEther(maxInvestment));
-      setMinInvestment(ethers.formatEther(minInvestment));
-      setIcoState(stateDescription); // Set the ICO state
+    try {
+      await provider.send("eth_requestAccounts", []);
+      const signer = await provider.getSigner();
+      const contractInstance = new ethers.Contract(
+        contractAddress,
+        abi,
+        signer
+      );
+
+      const userAddress = await signer.getAddress();
+      setSigner(signer);
+      setContract(contractInstance);
+      setAccount(userAddress);
+      setConnected(true);
     } catch (error) {
-      console.error("Failed to fetch ICO details", error);
+      console.error("Failed to connect wallet", error);
     }
   };
 
+  // Disconnect wallet
+  const disconnectWallet = () => {
+    setSigner(null);
+    setAccount(null);
+    setConnected(false);
+  };
+
+  // Invest function
   const invest = async (values: { amount: string }) => {
     if (!signer || !contract) return;
 
@@ -143,7 +122,8 @@ function App() {
       await tx.wait();
       message.success("Investment successful!");
       await fetchIcoDetails(contract);
-    } catch (e: any) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e:any) {
       console.log("Investment failed", e.message);
       message.error("Investment failed. Please try again.");
     }
@@ -159,12 +139,31 @@ function App() {
     return 0;
   };
 
+  // Fetch ICO details when component mounts
+  useEffect(() => {
+    if (window.ethereum) {
+      const tempProvider = new ethers.BrowserProvider(window.ethereum);
+      setProvider(tempProvider);
+
+      const contractInstance = new ethers.Contract(
+        contractAddress,
+        abi,
+        tempProvider
+      );
+      setContract(contractInstance);
+      fetchIcoDetails(contractInstance);
+    } else {
+      console.error("MetaMask not detected");
+    }
+  }, [fetchIcoDetails]);
+
   return (
     <>
       <Header
         connected={connected}
         connectWallet={connectWallet}
         disconnectWallet={disconnectWallet}
+        account={account}
       />
 
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 p-8">
@@ -193,7 +192,9 @@ function App() {
                         }
                         if (numericValue < 0.001 || numericValue > 1) {
                           return Promise.reject(
-                            new Error("Amount must be between 0.001 and 1 ETH")
+                            new Error(
+                              `Amount must be between ${minInvestment} and ${maxInvestment} ETH`
+                            )
                           );
                         }
                         return Promise.resolve();
@@ -274,26 +275,23 @@ function App() {
                   <p>
                     <strong>Opens:</strong> 2023-12-18 08:00:00 UTC
                   </p>
-
                   <p>
-                    <strong>Closes:</strong> 2023-12-18 14:00:00 UTC
+                    <strong>Closes:</strong> 2024-01-12 20:00:00 UTC
                   </p>
                   <p>
-                    <strong>Swap Rate:</strong> 1 Eth = 1000 KRPT
+                    <strong>Token Price:</strong> {tokenPrice} ETH
                   </p>
                 </Col>
                 <Col xs={24} md={12}>
                   <p>
-                    <strong>Hardcap:</strong> {hardCap} ETh
+                    <strong>Min Investment:</strong> {minInvestment} ETH
                   </p>
-
                   <p>
-                    <strong>Access Type:</strong> Public
+                    <strong>Max Investment:</strong> {maxInvestment} ETH
                   </p>
                 </Col>
               </Row>
             </Card>
-
             <Card
               title="Token Information"
               className="bg-gray-700 border-0 text-white"
@@ -317,6 +315,7 @@ function App() {
           </div>
         </div>
       </div>
+
       <Footer />
     </>
   );
