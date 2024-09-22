@@ -153,6 +153,7 @@ function App() {
       setContract(contractInstance);
       fetchIcoDetails(contractInstance);
     } else {
+      
       console.error("MetaMask not detected");
     }
   }, [fetchIcoDetails]);
