@@ -6,7 +6,7 @@ const Footer: React.FC = () => {
       <p>
         Contact:{" "}
         <a href="https://www.linkedin.com/in/your-profile" target="_blank" rel="noopener noreferrer" className="text-indigo-400">
-          LinkedIn
+          NamanPokharna
         </a>
       </p>
       <p>© 2024 Krypton ICO. All rights reserved.</p>
